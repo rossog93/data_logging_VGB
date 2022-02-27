@@ -9,6 +9,7 @@
 #define DHTTYPE DHT11   // DHT 11
 #define DHTPIN 15 
 #define ONE_WIRE_BUS 13
+#define AnalogInput 12
 
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
@@ -46,7 +47,7 @@ void read_18b20(void)
 
     lcd.clear();
     lcd.setCursor(0,0);
-    lcd.print("[18B20 sensor]");
+    lcd.print("[ds18b20 sensor]");
     lcd.setCursor(0,1);
     lcd.print("Temp:");
     lcd.print(temperatureC);
@@ -84,18 +85,26 @@ void read_dht(void)
   lcd.setCursor(0,0);
   lcd.print("Tmp:");
   lcd.print(t);
-  lcd.print("C [DHT11]");
+  lcd.print("C [DHT]");
   lcd.setCursor(0,1);
   lcd.print("Hum:");
   lcd.print(h);
   lcd.print(" %HR");
 }
 
-
+void read_analog_input(void)
+{
+  float milivots;
+  milivots = analogReadMilliVolts(AnalogInput);
+  Serial.println("Analog read:");
+  Serial.print(milivots);
+  Serial.print("mV");
+}
 
 void loop()
 {
 read_dht();
 read_18b20();
+read_analog_input();
 }
 
