@@ -5,16 +5,71 @@
 #include <LiquidCrystal_I2C.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <WiFi.h>
+
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+#include <AsyncElegantOTA.h>
 
 #define DHTTYPE DHT11   // DHT 11
 #define DHTPIN 15 
 #define ONE_WIRE_BUS 13
 #define AnalogInput 12
 
+
+// Replace with your network credentials
+//const char* ssid = "Zhone_6383";
+//const char* password = "znid306054787";
+//const char* ssid = "Rosso_wireless_JP";
+//const char* password = "mechi431799";
+const char* ssid = "OnePlus 7";
+const char* password = "hola1234";
+
+AsyncWebServer server(80);
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 LiquidCrystal_I2C lcd(0x27,16,2);  // set the LCD address to 0x27 for a 16 chars and 2 line display
 DHT dht(DHTPIN, DHTTYPE);
+
+void initWiFi() {
+  uint32_t notConnectedCounter = 0;
+
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi ..");
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print("Connecting WiFi");
+  lcd.setCursor(0,1);
+  lcd.print("Status:");
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print('.');
+    lcd.print(".");
+    delay(1000);
+
+    notConnectedCounter++;
+    if(notConnectedCounter > 15) { // Reset board if not connected after 5s
+        Serial.println("Resetting due to Wifi not connecting...");
+        ESP.restart();
+    }
+
+  }
+  Serial.println(WiFi.localIP());
+
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print("WIFI Connected!! ");
+  lcd.setCursor(0,1);
+  lcd.print(WiFi.localIP());
+  delay(1500);
+
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {request->send(200, "text/plain", "Hi! I am ESP8266.");});
+  AsyncElegantOTA.begin(&server);    // Start ElegantOTA
+  server.begin();
+  Serial.println("HTTP server started");
+
+} 
+
 
 void setup()
 {
@@ -33,7 +88,12 @@ void setup()
 
   //start ds18b20
   sensors.begin();
+
+  //init WIFI
+  initWiFi();
 }
+
+
 
 void read_18b20(void)
 {
@@ -105,6 +165,5 @@ void loop()
 {
 read_dht();
 read_18b20();
-read_analog_input();
 }
 
