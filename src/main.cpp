@@ -18,17 +18,16 @@
 
 
 // Replace with your network credentials
-//const char* ssid = "Zhone_6383";
-//const char* password = "znid306054787";
+const char* ssid = "Zhone_6383";
+const char* password = "znid306054787";
 //const char* ssid = "Rosso_wireless_JP";
 //const char* password = "mechi431799";
-const char* ssid = "OnePlus 7";
-const char* password = "hola1234";
+
 
 AsyncWebServer server(80);
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
-LiquidCrystal_I2C lcd(0x27,16,2);  // set the LCD address to 0x27 for a 16 chars and 2 line display
+LiquidCrystal_I2C lcd(0x27,20,4);  // set the LCD address to 0x27 for a 16 chars and 2 line display
 DHT dht(DHTPIN, DHTTYPE);
 
 void initWiFi() {
@@ -61,7 +60,7 @@ void initWiFi() {
   lcd.print("WIFI Connected!! ");
   lcd.setCursor(0,1);
   lcd.print(WiFi.localIP());
-  delay(1500);
+  delay(10000);
 
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {request->send(200, "text/plain", "Hi! I am ESP8266.");});
   AsyncElegantOTA.begin(&server);    // Start ElegantOTA
@@ -69,6 +68,32 @@ void initWiFi() {
   Serial.println("HTTP server started");
 
 } 
+
+
+void Scanner ()
+{
+  Serial.println ();
+  Serial.println ("I2C scanner. Scanning ...");
+  byte count = 0;
+
+  Wire.begin();
+  for (byte i = 8; i < 120; i++)
+  {
+    Wire.beginTransmission (i);          // Begin I2C transmission Address (i)
+    if (Wire.endTransmission () == 0)  // Receive 0 = success (ACK response) 
+    {
+      Serial.print ("Found address: ");
+      Serial.print (i, DEC);
+      Serial.print (" (0x");
+      Serial.print (i, HEX);     // PCF8574 7 bit address
+      Serial.println (")");
+      count++;
+    }
+  }
+  Serial.print ("Found ");      
+  Serial.print (count, DEC);        // numbers of devices
+  Serial.println (" device(s).");
+}
 
 
 void setup()
@@ -91,6 +116,9 @@ void setup()
 
   //init WIFI
   initWiFi();
+
+  //I2C scanner
+  //Scanner();
 }
 
 
