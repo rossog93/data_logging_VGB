@@ -6,6 +6,7 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <WiFi.h>
+#include <Adafruit_BMP280.h>
 
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
@@ -28,6 +29,9 @@ AsyncWebServer server(80);
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 LiquidCrystal_I2C lcd(0x27,20,4);  // set the LCD address to 0x27 for a 16 chars and 2 line display
+//BMP280 address:0x76
+Adafruit_BMP280 bmp; // I2C
+
 DHT dht(DHTPIN, DHTTYPE);
 
 void initWiFi() {
@@ -44,10 +48,9 @@ void initWiFi() {
   while (WiFi.status() != WL_CONNECTED) {
     Serial.print('.');
     lcd.print(".");
-    delay(1000);
-
+    delay(1500);
     notConnectedCounter++;
-    if(notConnectedCounter > 15) { // Reset board if not connected after 5s
+    if(notConnectedCounter > 20) { // Reset board if not connected after 5s
         Serial.println("Resetting due to Wifi not connecting...");
         ESP.restart();
     }
@@ -114,14 +117,56 @@ void setup()
   //start ds18b20
   sensors.begin();
 
+  //Start bmp280
+  bmp.begin(0x76);
+
+  //I2C scanner
+  Scanner();
+
   //init WIFI
   initWiFi();
 
-  //I2C scanner
-  //Scanner();
+
 }
 
+void read_bmp280(void)
+{
+  
+//Variables
+float pressure;		//To store the barometric pressure (Pa)
+float temperature;	//To store the temperature (oC)
+int altimeter; 		//To store the altimeter (m) (you can also use it as a float variable)
 
+	//Read values from the sensor:
+	pressure = bmp.readPressure();
+	temperature = bmp.readTemperature();
+	altimeter = bmp.readAltitude (1000); //Change the "1050.35" to your city current barrometric pressure (https://www.wunderground.com)
+	
+  //Print values to serial monitor:
+	Serial.print(F("Pressure: "));
+  Serial.print(pressure);
+  Serial.print(" Pa");
+  Serial.print("\t");
+  Serial.print(("Temp: "));
+  Serial.print(temperature);
+  Serial.print(" oC");
+	Serial.print("\t");  
+  Serial.print("Altimeter: ");
+  Serial.print(altimeter); // this should be adjusted to your local forcase
+  Serial.println(" m");
+    
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print("[bmp280]-T:");
+  lcd.print(temperature);
+  lcd.print("C");
+  lcd.setCursor(0,1);
+  lcd.print("P: ");
+  lcd.print(pressure);
+  lcd.print(" Pa");
+  delay(5000);
+  
+}
 
 void read_18b20(void)
 {
@@ -140,6 +185,8 @@ void read_18b20(void)
     lcd.print("Temp:");
     lcd.print(temperatureC);
     lcd.print("C");
+
+    delay(5000);
 }
 
 void read_dht(void)
@@ -178,6 +225,8 @@ void read_dht(void)
   lcd.print("Hum:");
   lcd.print(h);
   lcd.print(" %HR");
+
+  delay(5000);
 }
 
 void read_analog_input(void)
@@ -193,5 +242,7 @@ void loop()
 {
 read_dht();
 read_18b20();
+read_bmp280();
+
 }
 
