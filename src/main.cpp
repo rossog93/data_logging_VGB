@@ -8,14 +8,28 @@
 #include <WiFi.h>
 #include <Adafruit_BMP280.h>
 
+#include <InfluxDbClient.h>
+
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncElegantOTA.h>
+
 
 #define DHTTYPE DHT11   // DHT 11
 #define DHTPIN 15 
 #define ONE_WIRE_BUS 13
 #define AnalogInput 12
+
+#define uS_TO_S_FACTOR 1000000  /* Conversion factor for micro seconds to seconds */
+#define TIME_TO_SLEEP  300        /* Time ESP32 will go to sleep (in seconds) */
+
+
+#define INFLUXDB_URL "http://18.231.104.230:8086"
+#define INFLUXDB_BUCKET "ESP32_TEST"
+#define INFLUXDB_TOKEN "server token"
+#define INFLUXDB_ORG "org id"
+InfluxDBClient client(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
+Point data("from_esp32");
 
 
 // Replace with your network credentials
@@ -33,6 +47,23 @@ LiquidCrystal_I2C lcd(0x27,20,4);  // set the LCD address to 0x27 for a 16 chars
 Adafruit_BMP280 bmp; // I2C
 
 DHT dht(DHTPIN, DHTTYPE);
+
+void print_wakeup_reason(){
+  esp_sleep_wakeup_cause_t wakeup_reason;
+
+  wakeup_reason = esp_sleep_get_wakeup_cause();
+
+  switch(wakeup_reason)
+  {
+    case ESP_SLEEP_WAKEUP_EXT0 : Serial.println("Wakeup caused by external signal using RTC_IO"); break;
+    case ESP_SLEEP_WAKEUP_EXT1 : Serial.println("Wakeup caused by external signal using RTC_CNTL"); break;
+    case ESP_SLEEP_WAKEUP_TIMER : Serial.println("Wakeup caused by timer"); break;
+    case ESP_SLEEP_WAKEUP_TOUCHPAD : Serial.println("Wakeup caused by touchpad"); break;
+    case ESP_SLEEP_WAKEUP_ULP : Serial.println("Wakeup caused by ULP program"); break;
+    default : Serial.printf("Wakeup was not caused by deep sleep: %d\n",wakeup_reason); break;
+  }
+}
+
 
 void initWiFi() {
   uint32_t notConnectedCounter = 0;
@@ -123,11 +154,36 @@ void setup()
   //I2C scanner
   Scanner();
 
+  //ESP to sleep
+  esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+
   //init WIFI
   initWiFi();
 
 
 }
+
+
+
+void push_data(void)
+{
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print("InFlux Writing: ");
+  client.pointToLineProtocol(data);
+  lcd.setCursor(0,1);
+  lcd.print("done!");
+
+
+  if (!client.writePoint(data)) {
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print("InfluxDB write failed: ");
+    lcd.setCursor(0,1);
+    lcd.print(client.getLastErrorMessage());
+    delay(5000);}
+}
+
 
 void read_bmp280(void)
 {
@@ -165,13 +221,19 @@ int altimeter; 		//To store the altimeter (m) (you can also use it as a float va
   lcd.print(pressure);
   lcd.print(" Pa");
   delay(5000);
-  
+
+
+  data.clearFields();
+  data.addField("bmp280-temp",temperature);
+  data.addField("bmp280-pres",pressure);
+  data.addField("Altimeter",altimeter);
+  push_data();
+
 }
 
 void read_18b20(void)
 {
     sensors.requestTemperatures(); 
-    delay(5000);
     float temperatureC = sensors.getTempCByIndex(0);
 
     Serial.print("ds18B20 sensor ");
@@ -186,7 +248,9 @@ void read_18b20(void)
     lcd.print(temperatureC);
     lcd.print("C");
 
-    delay(5000);
+    data.clearFields();
+    data.addField("ds18b20",temperatureC);
+    push_data();
 }
 
 void read_dht(void)
@@ -226,7 +290,12 @@ void read_dht(void)
   lcd.print(h);
   lcd.print(" %HR");
 
-  delay(5000);
+  data.clearFields();
+  data.addField("dht-temp",t);
+  data.addField("dht-hum",h);
+
+  push_data();
+
 }
 
 void read_analog_input(void)
@@ -238,11 +307,22 @@ void read_analog_input(void)
   Serial.print("mV");
 }
 
+
 void loop()
 {
 read_dht();
 read_18b20();
 read_bmp280();
+
+lcd.clear();
+lcd.setCursor(0,0);
+lcd.println("Going to sleep...");
+lcd.setCursor(0,1);
+lcd.print(String(TIME_TO_SLEEP) +" Seconds");
+delay(5000);
+lcd.noBacklight();
+esp_deep_sleep_start();
+
 
 }
 
